@@ -17,8 +17,24 @@ public class Residente {
         this.listaVehiculos = new ListaSimpleVehiculo(); //nace con una lista vacia
 
     }
-    public boolean isEsSocio() {
-        return esSocio;
+
+    //regla: no se puede eliminar si un vehiculo no esta FUERA
+    public boolean puedeEliminarse() {
+        NodoSimpleVehiculo actual = listaVehiculos.getPrimero();
+
+        while(actual != null) {
+            if(actual.getDato().getEstado() != EstadoVehiculo.FUERA) {
+                return false; //hay un vehiculo adentro o en cola
+            }
+            actual = actual.getSiguiente();
+        }
+
+        return true; //si recorrimos toda la lista y todos estan FUERA, si se puede eliminar
+    }
+
+    regla: no se puede cambiar de socio si un vehiculo no esta FUERA
+    public boolean puedeCambiarSocio(){
+        return puedeEliminarse(); //mismo criterio que eliminarse
     }
 
     //getters basicos
@@ -34,8 +50,24 @@ public class Residente {
         return casa;
     }
 
+    public boolean isEsSocio() {
+        return esSocio;
+    }
+
+    public void setEsSocio(boolean esSocio) {
+        this.esSocio = esSocio;
+    }
+
     public ListaSimpleVehiculo getListaVehiculos() {
         return listaVehiculos;
+    }
+
+    public void setNombre(String nombre) {
+        this.nombre = nombre;
+    }
+
+    public void setCasa(String casa) {
+        this.casa = casa;
     }
     
 }
