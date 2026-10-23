@@ -34,7 +34,7 @@ public class Vehiculo {
             return TipoUsuario.VISITANTE;
         }
         if (this.propietario != null) {
-           if(this.propietario.isSocio()) {
+           if(this.propietario.isEsSocio()) {
                return TipoUsuario.SOCIO;
            } else {
                return TipoUsuario.NO_SOCIO;
@@ -43,7 +43,7 @@ public class Vehiculo {
          return null; // no deberia pasar si esta bien registrado
 
     }
-    getters y setters
+    //getters y setters
     public String getPlaca() {
         return placa;
     }   

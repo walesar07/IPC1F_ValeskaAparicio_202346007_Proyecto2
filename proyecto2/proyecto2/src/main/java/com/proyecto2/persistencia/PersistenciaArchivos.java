@@ -65,7 +65,7 @@ public class PersistenciaArchivos {
             }
 
         } catch (IOException e) {
-            System.out.println("Error al leer residentes: " + e.getMessage();
+            System.out.println("Error al leer residentes: " + e.getMessage());
         }
 
         //2. cargar vehiculos

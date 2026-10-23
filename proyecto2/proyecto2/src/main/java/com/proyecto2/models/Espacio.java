@@ -1,5 +1,6 @@
 package com.proyecto2.models;
 
+
 public class Espacio {
     private String id;
     private String tipo;//socio o general

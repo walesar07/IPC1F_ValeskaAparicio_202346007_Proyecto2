@@ -5,7 +5,7 @@ public class ColaFIFO {
     private NodoCola ultimo;
     private int tamano;
 
-    pubic ColaFIFO() {
+    public ColaFIFO() {
         this.frente = null;
         this.ultimo = null;
         this.tamano = 0;

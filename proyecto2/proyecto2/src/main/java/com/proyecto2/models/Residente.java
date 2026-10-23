@@ -7,14 +7,14 @@ public class Residente {
     private boolean esSocio;
 
     //aqui conectamos con nuestra lista simple
-    private ListaSimpleVehiculo listaVehiculos;
+    private ListaSimpleVehiculos listaVehiculos;
 
     public Residente(String id, String nombre, String casa, boolean esSocio) {
         this.id = id;
         this.nombre = nombre;
         this.casa = casa;
         this.esSocio = esSocio;
-        this.listaVehiculos = new ListaSimpleVehiculo(); //nace con una lista vacia
+        this.listaVehiculos = new ListaSimpleVehiculos(); //nace con una lista vacia
 
     }
 
@@ -32,7 +32,7 @@ public class Residente {
         return true; //si recorrimos toda la lista y todos estan FUERA, si se puede eliminar
     }
 
-    regla: no se puede cambiar de socio si un vehiculo no esta FUERA
+    //regla: no se puede cambiar de socio si un vehiculo no esta FUERA
     public boolean puedeCambiarSocio(){
         return puedeEliminarse(); //mismo criterio que eliminarse
     }
@@ -58,7 +58,7 @@ public class Residente {
         this.esSocio = esSocio;
     }
 
-    public ListaSimpleVehiculo getListaVehiculos() {
+    public ListaSimpleVehiculos getListaVehiculos() {
         return listaVehiculos;
     }
 

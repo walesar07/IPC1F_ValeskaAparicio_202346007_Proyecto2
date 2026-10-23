@@ -63,7 +63,7 @@ public class ListaSimpleVehiculos {
             return true;
         }
          
-        caso 2: el vehiculo a eliminar esta en el medio o al final
+        //caso 2: el vehiculo a eliminar esta en el medio o al final
         NodoSimpleVehiculo actual = primero;
 
         //necesitamos un puntero "anterior" para saltaros el nodo a eliminar
