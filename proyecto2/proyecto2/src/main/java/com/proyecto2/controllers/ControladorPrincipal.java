@@ -10,93 +10,151 @@ public class ControladorPrincipal {
     private ColaFIFO colaSalida;
     private PilaEventos historial;
     private PersistenciaArchivos persistencia;
-
+    
     private GaritaEntrada garita1;
     private GaritaEntrada garita2;
     private GaritaSalida garitaSalida;
 
-   // Para comunicarnos con la vista de forma segura
-   private Runnable actualizarVistaCallback;
+    // Callback para avisar a la Vista que debe redibujarse
+    private Runnable actualizarVistaCallback;
 
-   private ControladorPrincipal() {
-    this.residentes = new ListaDobleResidentes();
-    this.parqueo = new Parqueo();
-    this.colaEntrada = new ColaFIFO();
-    this.colaSalida = new ColaFIFO();
-    this.historial = new PilaEventos();
-    this.persistencia = new PersistenciaArchivos();
+    public ControladorPrincipal() {
+        this.residentes = new ListaDobleResidentes();
+        this.parqueo = new Parqueo();
+        this.colaEntrada = new ColaFIFO();
+        this.colaSalida = new ColaFIFO();
+        this.historial = new PilaEventos();
+        this.persistencia = new PersistenciaArchivos();
+    }
 
-   }
+    public void setActualizarVistaCallback(Runnable callback) {
+        this.actualizarVistaCallback = callback;
+    }
 
-   //Se llamara desde la vista una vez que la ventana este lista
-   public void setActualizarVistaCallback(Runnable callback) {
-    this.actualizarVistaCallback = callback;
+    public void iniciarSimulacion() {
+        garita1 = new GaritaEntrada(1, colaEntrada, parqueo, historial, actualizarVistaCallback);
+        garita2 = new GaritaEntrada(2, colaEntrada, parqueo, historial, actualizarVistaCallback);
+        garitaSalida = new GaritaSalida(colaSalida, parqueo, historial, actualizarVistaCallback);
 
-   }
+        garita1.start();
+        garita2.start();
+        garitaSalida.start();
+    }
 
-   public void iniciarSimulacion() {
-    //creamos los hilos pasandoles las MISMAS referencias
-    //Esto es vital: todos operan sobre las mismas colas y el mismo parqueo
-    garita1 = new GaritaEntrada(1, colaEntrada, parqueo, historial, actualizarVistaCallback);
-    garita2 = new GaritaEntrada(2, colaEntrada, parqueo, historial, actualizarVistaCallback);
-    garitaSalida = new GaritaSalida(colaSalida, parqueo, historial, actualizarVistaCallback);
+    public void detenerSimulacion() {
+        if (garita1 != null) garita1.detener();
+        if (garita2 != null) garita2.detener();
+        if (garitaSalida != null) garitaSalida.detener();
+    }
 
-    //Arrancamos los hilos 
-    garita1.start();
-    garita2.start();
-    garitaSalida.start();
-   }
-
-   public void detenerSimulacion() {
-    if( garita1 != null) garita1.detener();
-    if (garita2 != null) garita2.detener();
-    if (garitaSalida != null) garitaSalida.detener();
-
-   }
-
-   
-     
-    // MÉTODOS DE NEGOCIO (Llamados por la Vista)
-    
+    // ==========================================
+    // GESTIÓN DE RESIDENTES Y VEHÍCULOS
+    // ==========================================
 
     public boolean registrarResidente(Residente r) {
         if (r.getId().contains("|") || r.getNombre().contains("|") || r.getCasa().contains("|")) {
-            return false; // El PDF prohíbe el carácter | en los campos
+            return false;
         }
-        return residentes.insertar(r);
+        
+        boolean insertado = residentes.insertar(r);
+        if (insertado && actualizarVistaCallback != null) {
+            actualizarVistaCallback.run();
+        }
+        return insertado;
+    }
+
+    public boolean modificarResidente(String id, String nuevoNombre, String nuevaCasa, boolean nuevoEsSocio) {
+        Residente r = residentes.buscar(id);
+        if (r == null) return false;
+
+        // REGLA DEL PDF: Si cambia de estatus (socio/no socio), validar vehículos
+        if (r.isEsSocio() != nuevoEsSocio) {
+            if (!r.puedeCambiarSocio()) {
+                return false; // Tiene vehículos adentro/fuera, no se puede cambiar
+            }
+        }
+
+        r.setNombre(nuevoNombre);
+        r.setCasa(nuevaCasa);
+        r.setEsSocio(nuevoEsSocio);
+        
+        synchronized (historial) {
+            historial.push(new Evento("MODIFICACIÓN", "Residente modificado: " + id, null));
+        }
+        if (actualizarVistaCallback != null) actualizarVistaCallback.run();
+        return true;
+    }
+
+    public boolean eliminarResidente(String id) {
+        boolean eliminado = residentes.eliminar(id);
+        if (eliminado) {
+            synchronized (historial) {
+                historial.push(new Evento("ELIMINACIÓN", "Residente eliminado: " + id, null));
+            }
+            if (actualizarVistaCallback != null) actualizarVistaCallback.run();
+        }
+        return eliminado;
     }
 
     public boolean registrarVehiculo(String idResidente, Vehiculo v) {
         if (v.getPlaca().contains("|") || existePlacaEnSistema(v.getPlaca())) {
-            return false; // Placa única en todo el sistema
+            return false;
         }
         
         Residente r = residentes.buscar(idResidente);
         if (r == null) return false;
 
         v.setPropietario(r);
-        return r.getListaVehiculos().insertar(v);
-    }
+        boolean insertado = r.getListaVehiculos().insertar(v);
 
-    // MÉTODO CRÍTICO: Enviar a cola de entrada
-    public boolean enviarVehiculoAEntrada(String placa) {
-        // 1. Buscar el vehículo entre todos los residentes (simplificado para el ejemplo)
-        Vehiculo v = buscarVehiculoEnResidentes(placa);
-        
-        if (v == null || v.getEstado() != EstadoVehiculo.FUERA) {
-            return false; // Solo se encolan vehículos FUERA
+        if (insertado) {
+            synchronized (historial) {
+                historial.push(new Evento("VEHÍCULO REGISTRADO", "Vehículo " + v.getPlaca() + " agregado al residente " + idResidente, null));
+            }
+            if (actualizarVistaCallback != null) actualizarVistaCallback.run();
         }
 
-        // 2. Cambiar estado y encolar
+        return insertado;
+    }
+
+    public boolean eliminarVehiculo(String idResidente, String placa) {
+        Residente r = residentes.buscar(idResidente);
+        if (r == null) return false;
+
+        Vehiculo v = r.getListaVehiculos().buscar(placa);
+        if (v == null) return false;
+
+        // REGLA DEL PDF: Solo se elimina si está FUERA
+        if (v.getEstado() != EstadoVehiculo.FUERA) return false;
+
+        boolean eliminado = r.getListaVehiculos().eliminar(placa);
+        if (eliminado) {
+            synchronized (historial) {
+                historial.push(new Evento("VEHÍCULO ELIMINADO", "Vehículo " + placa + " eliminado del residente " + idResidente, null));
+            }
+            if (actualizarVistaCallback != null) actualizarVistaCallback.run();
+        }
+        return eliminado;
+    }
+
+    // ==========================================
+    // FLUJO DE ENTRADA Y SALIDA (HILOS)
+    // ==========================================
+
+    public boolean enviarVehiculoAEntrada(String placa) {
+        Vehiculo v = buscarVehiculoGlobal(placa);
+        
+        if (v == null || v.getEstado() != EstadoVehiculo.FUERA) {
+            return false; 
+        }
+
         v.setEstado(EstadoVehiculo.EN_COLA_ENTRADA);
         
         synchronized (colaEntrada) {
             colaEntrada.encolar(v);
-            // 3. Avisar a las garitas (Despertar hilos)
             colaEntrada.notifyAll(); 
         }
 
-        // 4. Registrar evento
         synchronized (historial) {
             historial.push(new Evento("EN COLA", "Vehículo " + placa + " en cola de entrada", null));
         }
@@ -105,19 +163,18 @@ public class ControladorPrincipal {
         return true;
     }
 
-    // MÉTODO CRÍTICO: Solicitar salida
     public boolean solicitarSalida(String placa) {
-        Vehiculo v = buscarVehiculoEnResidentes(placa);
+        Vehiculo v = buscarVehiculoGlobal(placa);
         
         if (v == null || v.getEstado() != EstadoVehiculo.ESTACIONADO) {
-            return false; // Solo se pueden salir vehículos ESTACIONADOS
+            return false; 
         }
 
         v.setEstado(EstadoVehiculo.EN_COLA_SALIDA);
         
         synchronized (colaSalida) {
             colaSalida.encolar(v);
-            colaSalida.notifyAll(); // Despertar garita de salida
+            colaSalida.notifyAll(); 
         }
 
         synchronized (historial) {
@@ -134,7 +191,7 @@ public class ControladorPrincipal {
         }
         
         Residente residenteVisitado = residentes.buscar(visitante.getIdResidenteVisita());
-        if (residenteVisitado == null) return false; // El residente debe existir
+        if (residenteVisitado == null) return false; 
 
         Vehiculo v = new Vehiculo(visitante.getPlaca(), "N/A", "N/A", "N/A", "Automovil");
         v.setVisitante(visitante);
@@ -153,19 +210,34 @@ public class ControladorPrincipal {
         return true;
     }
 
-    // Método auxiliar para buscar placas
+    // ==========================================
+    // MÉTODOS AUXILIARES Y PERSISTENCIA
+    // ==========================================
+
     public boolean existePlacaEnSistema(String placa) {
-        return buscarVehiculoEnResidentes(placa) != null;
+        return buscarVehiculoGlobal(placa) != null;
     }
 
-    private Vehiculo buscarVehiculoEnResidentes(String placa) {
+    public Vehiculo buscarVehiculoGlobal(String placa) {
+        // 1. Buscar en residentes
         NodoDobleResidente actual = residentes.getPrimero();
         while (actual != null) {
             Vehiculo v = actual.getDato().getListaVehiculos().buscar(placa);
             if (v != null) return v;
             actual = actual.getSiguiente();
         }
-        return null;
+        
+        // 2. Buscar en parqueo (Socios)
+        if (parqueo.getAreaSocios().buscarOcupado(placa) != null) {
+            return parqueo.getAreaSocios().buscarOcupado(placa).getVehiculoEstacionado();
+        }
+        
+        // 3. Buscar en parqueo (General/Visitantes)
+        if (parqueo.getAreaGeneral().buscarOcupado(placa) != null) {
+            return parqueo.getAreaGeneral().buscarOcupado(placa).getVehiculoEstacionado();
+        }
+        
+        return null; 
     }
 
     public void guardarDatos() {
@@ -176,7 +248,10 @@ public class ControladorPrincipal {
         this.residentes = persistencia.cargarDatos(historial);
     }
 
-    // Getters para que la Vista pueda leer los datos
+    // ==========================================
+    // GETTERS PARA LA VISTA
+    // ==========================================
+
     public ListaDobleResidentes getResidentes() { return residentes; }
     public Parqueo getParqueo() { return parqueo; }
     public ColaFIFO getColaEntrada() { return colaEntrada; }
@@ -186,10 +261,3 @@ public class ControladorPrincipal {
     public GaritaEntrada getGarita2() { return garita2; }
     public GaritaSalida getGaritaSalida() { return garitaSalida; }
 }
-
-
-     
-
-
-
-

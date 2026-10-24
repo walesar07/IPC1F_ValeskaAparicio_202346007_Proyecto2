@@ -8,39 +8,44 @@ public class PersistenciaArchivos {
     private static final String ARCHIVO_RESIDENTES = "residentes.txt";
     private static final String ARCHIVO_VEHICULOS = "vehiculos.txt";
 
-    public void guardarDatos(ListaDobleResidentes lista){
-        try(BufferedWriter writerRes = new BufferedWriter(new FileWriter(ARCHIVO_RESIDENTES));
-        BufferedWriter writerVeh = new BufferedWriter(new FileWriter(ARCHIVO_VEHICULOS))){
+        public void guardarDatos(ListaDobleResidentes lista) {
+        // Esto te dirá en la consola exactamente en qué carpeta se están guardando
+        File archivoRes = new File("residentes.txt");
+        System.out.println("Guardando archivos en: " + archivoRes.getAbsolutePath());
 
+        try (BufferedWriter writerRes = new BufferedWriter(new FileWriter(archivoRes));
+             BufferedWriter writerVeh = new BufferedWriter(new FileWriter("vehiculos.txt"))) {
+            
             NodoDobleResidente actual = lista.getPrimero();
-            while(actual != null){
-
+            while (actual != null) {
                 Residente r = actual.getDato();
-
-                //Formato: ID|NOMBRE|CASA|SOCIO (S O N)
+                
                 String lineaRes = r.getId() + "|" + r.getNombre() + "|" + r.getCasa() + "|" + (r.isEsSocio() ? "S" : "N");
                 writerRes.write(lineaRes);
                 writerRes.newLine();
-
-                //ahora guardamos los vehiculos de este residente
+                
                 NodoSimpleVehiculo vehiculoActual = r.getListaVehiculos().getPrimero();
-                while(vehiculoActual != null) {
+                while (vehiculoActual != null) {
                     Vehiculo v = vehiculoActual.getDato();
-                    //Formato: PLACA|MARCA|MODELO|COLOR|ID_RESIDENTE
                     String lineaVeh = v.getPlaca() + "|" + v.getMarca() + "|" + v.getModelo() + "|" + v.getColor() + "|" + r.getId();
                     writerVeh.write(lineaVeh);
                     writerVeh.newLine();
-
+                    
                     vehiculoActual = vehiculoActual.getSiguiente();
-                }            
+                }
                 actual = actual.getSiguiente();
             }
-
-        }catch(IOException e) {
-            System.out.println("Error al guardar archivos: " + e.getMessage());
+            // Forzamos a que se escriba todo en el disco
+            writerRes.flush();
+            writerVeh.flush();
+            System.out.println("¡Datos guardados exitosamente!");
+            
+        } catch (IOException e) {
+            System.out.println("ERROR AL GUARDAR: " + e.getMessage());
+            e.printStackTrace();
         }
     }
-
+    
     public ListaDobleResidentes cargarDatos(PilaEventos historial) {
         ListaDobleResidentes residentes = new ListaDobleResidentes();
         File archivoRes = new File(ARCHIVO_RESIDENTES);
